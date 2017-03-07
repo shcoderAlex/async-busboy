@@ -72,38 +72,39 @@ module.exports = function (request, options) {
       busboy.removeListener('finish', onEnd);
     }
   });
-};
 
-function onField(fields, name, val, fieldnameTruncated, valTruncated) {
-  // don't overwrite prototypes
-  if (getDescriptor(Object.prototype, name)) return;
+  function onField(fields, name, val, fieldnameTruncated, valTruncated) {
+    // don't overwrite prototypes
+    if (getDescriptor(Object.prototype, name)) return;
 
-  // This looks like a stringified array, let's parse it
-  if (name.indexOf('[') > -1) {
-    const obj = objectFromBluePrint(extractFormData(name), val);
-    reconcile(obj, fields);
+    // This looks like a stringified array, let's parse it
+    if (name.indexOf('[') > -1) {
+      const obj = objectFromBluePrint(extractFormData(name), val);
+      reconcile(obj, fields);
 
-  } else {
-    fields[name] = val;
+    } else {
+      fields[name] = val;
+    }
   }
-}
 
-function onFile(files, fieldname, file, filename, encoding, mimetype) {
-  const tmpName = file.tmpName = new Date().getTime()  + fieldname  + filename;
-  const saveTo = path.join(os.tmpdir(), path.basename(tmpName));
-  file.on('end', () => {
-    const readStream = fs.createReadStream(saveTo);
-    readStream.fieldname = fieldname;
-    readStream.filename = filename;
-    readStream.transferEncoding = readStream.encoding = encoding;
-    readStream.mimeType = readStream.mime = mimetype;
-    files.push(readStream);
-  });
-  const writeStream = fs.createWriteStream(saveTo);
-  writeStream.on('open', () => {
-    file.pipe(fs.createWriteStream(saveTo));
-  });
-}
+  function onFile(files, fieldname, file, filename, encoding, mimetype) {
+    const tmpName = file.tmpName = new Date().getTime()  + fieldname  + filename;
+    const updateDir = options.updateDir || os.tmpdir();
+    const saveTo = path.join(updateDir, path.basename(tmpName));
+    file.on('end', () => {
+      const readStream = fs.createReadStream(saveTo);
+      readStream.fieldname = fieldname;
+      readStream.filename = filename;
+      readStream.transferEncoding = readStream.encoding = encoding;
+      readStream.mimeType = readStream.mime = mimetype;
+      files.push(readStream);
+    });
+    const writeStream = fs.createWriteStream(saveTo);
+    writeStream.on('open', () => {
+      file.pipe(fs.createWriteStream(saveTo));
+    });
+  }
+};
 
 /**
  *
